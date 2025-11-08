@@ -1,0 +1,13 @@
+av_racing:
+  pure_pursuit_controller:
+    v_base: 0.40
+    v_min: 0.10
+    v_max: 0.70
+    alpha_phi: 2.0
+    alpha_d: 2.5
+    alpha_kappa: 0.6
+    lookahead_base: 0.20
+    lookahead_gain: 0.60
+    kappa_limit: 3.0
+    baseline: 0.10
+    cmd_topic: "/car_cmd_switch_node/cmd"
