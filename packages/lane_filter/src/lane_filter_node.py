@@ -218,18 +218,63 @@ class LaneFilterNode(DTROS):
                 dt_segment_color = SegmentColor.YELLOW
             elif segment.color == SegmentMsg.RED:
                 dt_segment_color = SegmentColor.RED
+            else:
+                self.loginfo(f"[lane_filter_node] Unknown segment color {segment.color}, skipping segment")
+                continue
 
-            dt_points = []
-            for point in segment.points:
-                dt_point = SegmentPoint(x=point.x, y=point.y)
-                dt_points.append(dt_point)
+            # dt_points = []  
+            # for point in segment.points:
+            #     dt_point = SegmentPoint(x=point.x, y=point.y)
+            #     dt_points.append(dt_point)
 
-            dt_segment = Segment(points=dt_points, color=dt_segment_color)
+            # dt_segment = Segment(points=dt_points, color=dt_segment_color)
+            # dt_segment_list.append(dt_segment)
+            
+        ######### NEW CODE #########
+            # Need at least 2 points
+            points_array = segment.pixels_normalized
+            if len(points_array) < 2:
+                continue
+
+            p1 = points_array[0]
+            p2 = points_array[1]
+
+            dx = p2.x - p1.x
+            dy = p2.y - p1.y
+
+            # Skip zero-length or almost zero-length segments
+            if abs(dx) < 1e-6 and abs(dy) < 1e-6:
+                self.loginfo("[lane_filter_node] Skipping zero-length segment")
+                rospy.logwarn_throttle(
+                    1.0,
+                    "[lane_filter_node] Skipping zero-length segment"
+                )
+                continue
+
+            # Build dt_state_estimation segment
+            dt_segment = Segment(
+                points=[
+                    SegmentPoint(x=p1.x, y=p1.y),
+                    SegmentPoint(x=p2.x, y=p2.y),
+                ],
+                color=dt_segment_color,
+            )
             dt_segment_list.append(dt_segment)
 
+        if not dt_segment_list:
+            # Nothing valid to update with; don't call the filter
+            self.loginfo("[lane_filter_node] No valid segments to process.")
+            return
 
-        self.filter.update(dt_segment_list)
+        try:
+            self.filter.update(dt_segment_list)
+        except Exception as e:
+            rospy.logerr("[lane_filter_node] filter.update() failed: %s", e)
+            return
+        ##########################################
 
+        #self.filter.update(dt_segment_list)
+        self.loginfo("Right before publishEstimate")
         self.publishEstimate(segment_list_msg.header)
 
     def publishEstimate(self, header):

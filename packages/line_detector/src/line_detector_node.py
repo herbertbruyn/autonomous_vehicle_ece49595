@@ -143,7 +143,7 @@ class LineDetectorNode(DTROS):
             image_msg (:obj:`sensor_msgs.msg.CompressedImage`): The receive image message
 
         """
-        self.loginfo("Processing image in image_cb.")
+        # self.loginfo("Processing image in image_cb.")
 
         # Decode from compressed image with OpenCV
         try:
@@ -228,7 +228,7 @@ class LineDetectorNode(DTROS):
                     self.logerr(f"Color name {color} is not defined in the Segment type")
 
         # Publish the message
-        self.loginfo(f"Published SegmentList with {len(segment_list.segments)} segments.")
+        #self.loginfo(f"Published SegmentList with {len(segment_list.segments)} segments.")
         self.pub_lines.publish(segment_list)
         
         if self.cuda_enabled:
@@ -239,7 +239,7 @@ class LineDetectorNode(DTROS):
             image = gpu_image
 
         # If there are any subscribers to the debug topics, generate a debug image and publish it
-        if self.pub_d_segments.get_num_connections() >= 0:
+        if self.pub_d_segments.get_num_connections() > 0:
             debug_img = draw_segments(image,
                                       {
                                         self.color_ranges["YELLOW"]: color_detections[0],
@@ -263,7 +263,7 @@ class LineDetectorNode(DTROS):
             
             # Save the image using OpenCV
             cv2.imwrite(filename, debug_img)
-            self.loginfo(f"Saved segment debug image to {filename}")
+            # self.loginfo(f"Saved segment debug image to {filename}")
 
 
 
