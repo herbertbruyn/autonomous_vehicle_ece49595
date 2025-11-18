@@ -10,4 +10,19 @@ av_racing:
     lookahead_gain: 0.60
     kappa_limit: 3.0
     baseline: 0.10
-    cmd_topic: "/car_cmd_switch_node/cmd"
+    cmd_topic: "~racing_cmd"  # Publish to avoidance controller instead
+  
+  tof_obstacle_detector:
+    stop_distance: 0.12   # Emergency only
+    slow_distance: 0.30   # Close range
+    warn_distance: 0.50   # Avoidance range
+  
+  obstacle_avoidance_controller:
+    # RACING OPTIMIZED PARAMETERS
+    emergency_distance: 0.12    # Only stop if VERY close (12cm!)
+    avoid_distance: 0.50        # Start steering at 50cm
+    avoid_omega_gain: 3.5       # Aggressive steering (higher = sharper turns)
+    speed_reduction: 0.80       # Keep 80% speed while avoiding (minimal loss)
+    max_omega: 6.0              # Maximum turning rate (prevent spinning out)
+    direction_mode: "lane_position"  # Smart direction based on lane position
+    # Options: 'lane_position' (smart), 'alternate', 'right', 'left'
