@@ -131,11 +131,11 @@ class LaneFilterNode(DTROS):
         )
 
         self.pub_belief_img = rospy.Publisher(
-             "~debug/belief_img/compressed", CompressedImage, queue_size=1, dt_topic_type=TopicType.DEBUG
+             "/mcqueen95/debug/belief_img/compressed", CompressedImage, queue_size=1, dt_topic_type=TopicType.DEBUG
         )
 
         self.pub_plot_d_phi = rospy.Publisher(
-            "~debug/plot_d_phi/compressed", CompressedImage, queue_size=1, dt_topic_type=TopicType.DEBUG
+            "/mcqueen95/debug/plot_d_phi/compressed", CompressedImage, queue_size=1, dt_topic_type=TopicType.DEBUG
         )
 
 

@@ -107,8 +107,8 @@ class PurePursuitRacer:
         self.last_v = v_cmd
         cmd = Twist2DStamped()
         cmd.header.stamp = rospy.Time.now()
-        cmd.v = v_cmd
-        cmd.omega = omega_cmd
+        cmd.v = -v_cmd
+        cmd.omega = -omega_cmd
         self.pub_cmd.publish(cmd)
         rospy.loginfo(f"[pure_pursuit] Published command: v={cmd.v}, omega={cmd.omega}")
 
