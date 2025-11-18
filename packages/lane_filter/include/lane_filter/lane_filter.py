@@ -1,0 +1,301 @@
+from math import floor, sqrt
+
+
+from math import floor, sqrt
+from collections import OrderedDict
+import numpy as np
+import duckietown_code_utils as dtu
+from scipy.ndimage.filters import gaussian_filter
+from scipy.stats import entropy, multivariate_normal
+
+from lane_filter_interface import LaneFilterInterface
+from .visualization import plot_phi_d_diagram_bgr
+
+__all__ = ["LaneFilterHistogram"]
+
+
+class LaneFilterHistogram():
+    """Generates an estimate of the lane pose.
+
+
+    Creates and maintain a histogram grid filter to estimate the lane pose.
+    Lane pose is defined as the tuple (`d`, `phi`) : lateral deviation and angulare deviation from the
+    center of the lane.
+
+    Predict step : Uses the estimated linear and angular velocities to predict the change in the lane pose.
+    Update Step : The filter receives a segment list. For each segment, it extracts the corresponding lane
+    pose "votes",
+    and adds it to the corresponding part of the histogram.
+
+    Best estimate correspond to the slot of the histogram with the highest voted value.
+
+    Args:
+        configuration (:obj:`List`): A list of the parameters for the filter
+
+    """
+
+    mean_d_0: float
+    mean_phi_0: float
+    sigma_d_0: float
+    sigma_phi_0: float
+    delta_d: float
+    delta_phi: float
+    d_max: float
+    d_min: float
+    phi_max: float
+    phi_min: float
+    linewidth_white: float
+    linewidth_yellow: float
+    lanewidth: float
+    min_max: float
+    sigma_d_mask: float
+    sigma_phi_mask: float
+    range_min: float
+    range_est: float
+    range_max: float
+
+    def __init__(self, encoder_resolution, wheel_baseline, wheel_radius, **kwargs):
+        self.encoder_resolution = encoder_resolution
+        self.wheel_baseline = wheel_baseline
+        self.wheel_radius = wheel_radius
+
+        param_names = [
+            "mean_d_0", # the initial mean lateral offset (probably 0)
+            "mean_phi_0", # the initial mean angular offset (probably 0)
+            "sigma_d_0",
+            "sigma_phi_0",
+            "delta_d",
+            "delta_phi",
+            "d_max",
+            "d_min",
+            "phi_max",
+            "phi_min",
+            "cov_v",
+            "linewidth_white",
+            "linewidth_yellow",
+            "lanewidth",
+            "min_max",
+            "sigma_d_mask",
+            "sigma_phi_mask",
+            "range_min",
+            "range_est",
+            "range_max",
+        ]
+
+        for p_name in param_names:
+            assert p_name in kwargs, (p_name, param_names, kwargs)
+            setattr(self, p_name, kwargs[p_name])
+
+        self.d, self.phi = np.mgrid[
+            self.d_min : self.d_max : self.delta_d, self.phi_min : self.phi_max : self.delta_phi
+        ]
+
+        self.d_pcolor, self.phi_pcolor = np.mgrid[
+            self.d_min : (self.d_max + self.delta_d) : self.delta_d,
+            self.phi_min : (self.phi_max + self.delta_phi) : self.delta_phi,
+        ]
+
+        self.belief = np.empty(self.d.shape)
+
+        self.mean_0 = [self.mean_d_0, self.mean_phi_0]
+        self.cov_0 = [[self.sigma_d_0, 0], [0, self.sigma_phi_0]]
+        self.cov_mask = [self.sigma_d_mask, self.sigma_phi_mask]
+
+        # Additional variables
+        self.red_to_white = False
+        self.use_yellow = True
+        self.range_est_min = 0
+        self.filtered_segments = []
+        self.initialized = False
+
+        self.initialize_belief()
+
+    def initialize_belief(self):
+        pos = np.empty(self.d.shape + (2,))
+        pos[:, :, 0] = self.d
+        pos[:, :, 1] = self.phi
+        RV = multivariate_normal(self.mean_0, self.cov_0)
+        self.belief = RV.pdf(pos)
+        self.belief = self.belief/np.sum(self.belief)
+
+        self.initialized = True
+
+    def getStatus(self):
+        return LaneFilterInterface.GOOD
+
+    def get_entropy(self):
+        belief = self.belief
+        s = entropy(belief.flatten())
+        return s
+
+    def predict(self, left_encoder_ticks, right_encoder_ticks):
+        if not self.initialized:
+            return
+        # Calculate v and w from ticks using kinematics
+        R = self.wheel_radius
+        alpha = 2 * np.pi / self.encoder_resolution
+        d_left = R * alpha * left_encoder_ticks 
+        d_right = R * alpha * right_encoder_ticks
+        d_A = (d_left + d_right) / 2
+        w = (d_right - d_left) / self.wheel_baseline
+        [d_t, phi_t] = self.getEstimate()
+        v = d_A * np.sin(w + phi_t)
+
+        # Propagate each centroid forward using the kinematic function
+        d_t = self.d + v 
+        phi_t = self.phi + w 
+
+        p_belief = np.zeros(self.belief.shape)
+
+        # there has got to be a better/cleaner way to do this - just applying the process model to
+        # translate each cell value
+        for i in range(self.belief.shape[0]):
+            for j in range(self.belief.shape[1]):
+                if self.belief[i, j] > 0:
+                    if (
+                        d_t[i, j] > self.d_max
+                        or d_t[i, j] < self.d_min
+                        or phi_t[i, j] < self.phi_min
+                        or phi_t[i, j] > self.phi_max
+                    ):
+                        continue
+
+                    i_new = int(floor((d_t[i, j] - self.d_min) / self.delta_d))
+                    j_new = int(floor((phi_t[i, j] - self.phi_min) / self.delta_phi))
+
+                    p_belief[i_new, j_new] += self.belief[i, j]
+
+        s_belief = np.zeros(self.belief.shape)
+        gaussian_filter(p_belief, self.cov_mask, output=s_belief, mode="constant")
+
+        if np.sum(s_belief) == 0:
+            return
+
+        self.belief = s_belief / np.sum(s_belief)
+
+    # prepare the segments for the creation of the belief arrays
+    def prepareSegments(self, segments):
+        segmentsArray = []
+        self.filtered_segments = []
+        for segment in segments:
+
+            # we don't care about RED ones for now
+            if segment.color != segment.WHITE and segment.color != segment.YELLOW:
+                continue
+            # filter out any segments that are behind us
+            if segment.points[0].x < 0 or segment.points[1].x < 0:
+                continue
+
+            self.filtered_segments.append(segment)
+            # only consider points in a certain range from the Duckiebot for the position estimation
+            point_range = self.getSegmentDistance(segment)
+            if self.range_est > point_range > self.range_est_min:
+                segmentsArray.append(segment)
+
+        return segmentsArray
+
+    def update(self, segments):
+        if not self.initialized:
+            return
+
+        # prepare the segments for each belief array
+        segmentsArray = self.prepareSegments(segments)
+        # generate all belief arrays
+
+        measurement_likelihood = self.generate_measurement_likelihood(segmentsArray)
+
+        if measurement_likelihood is not None:
+            self.belief = np.multiply(self.belief, measurement_likelihood)
+            if np.sum(self.belief) == 0:
+                self.belief = measurement_likelihood
+            else:
+                self.belief /= np.sum(self.belief)
+
+    def generate_measurement_likelihood(self, segments):
+
+        # initialize measurement likelihood to all zeros
+        measurement_likelihood = np.zeros(self.d.shape)
+
+        for segment in segments:
+            d_i, phi_i = self.generateVote(segment)
+
+            # if the vote lands outside of the histogram discard it
+            if d_i > self.d_max or d_i < self.d_min or phi_i < self.phi_min or phi_i > self.phi_max:
+                continue
+
+            i = int(floor((d_i - self.d_min) / self.delta_d))
+            j = int(floor((phi_i - self.phi_min) / self.delta_phi))
+            measurement_likelihood[i, j] += 1
+
+        if np.linalg.norm(measurement_likelihood) == 0:
+            return None
+        measurement_likelihood /= np.sum(measurement_likelihood)
+        return measurement_likelihood
+
+    def getEstimate(self):
+        maxids = np.unravel_index(self.belief.argmax(), self.belief.shape)
+        d_max = self.d_min + (maxids[0] + 0.5) * self.delta_d
+        phi_max = self.phi_min + (maxids[1] + 0.5) * self.delta_phi
+
+        return [d_max, phi_max]
+
+    def get_estimate(self):
+        d, phi = self.getEstimate()
+        res = {}
+        res["d"] = d
+        res["phi"] = phi
+        return res
+
+    def getMax(self):
+        return self.belief.max()
+
+    # generate a vote for one segment
+    def generateVote(self, segment):
+        p1 = np.array([segment.points[0].x, segment.points[0].y])
+        p2 = np.array([segment.points[1].x, segment.points[1].y])
+        t_hat = (p2 - p1) / np.linalg.norm(p2 - p1)
+
+        n_hat = np.array([-t_hat[1], t_hat[0]])
+        d1 = np.inner(n_hat, p1)
+        d2 = np.inner(n_hat, p2)
+        l1 = np.inner(t_hat, p1)
+        l2 = np.inner(t_hat, p2)
+        if l1 < 0:
+            l1 = -l1
+        if l2 < 0:
+            l2 = -l2
+
+        l_i = (l1 + l2) / 2
+        d_i = (d1 + d2) / 2
+        phi_i = np.arcsin(t_hat[1])
+        if segment.color == segment.WHITE:  # right lane is white
+            if p1[0] > p2[0]:  # right edge of white lane
+                d_i -= self.linewidth_white
+            else:  # left edge of white lane
+                d_i -= self.linewidth_white
+                d_i = self.lanewidth * 2 + self.linewidth_yellow - d_i
+                phi_i = -phi_i
+            d_i -= self.lanewidth / 2
+
+        elif segment.color == segment.YELLOW:  # left lane is yellow
+            if p2[0] > p1[0]:  # left edge of yellow lane
+                d_i -= self.linewidth_yellow
+                d_i = self.lanewidth/2 - d_i
+                phi_i = -phi_i
+            else:  # right edge of yellow lane
+                d_i += self.linewidth_yellow
+                d_i -= self.lanewidth/2
+
+        return d_i, phi_i
+
+
+    # get the distance from the center of the Duckiebot to the center point of a segment
+    def getSegmentDistance(self, segment):
+        x_c = (segment.points[0].x + segment.points[1].x) / 2
+        y_c = (segment.points[0].y + segment.points[1].y) / 2
+        return sqrt(x_c**2 + y_c**2)
+
+    #FIXME: Fix Bugs in the Visualization 
+    def get_plot_phi_d(self, ground_truth=None) -> dtu.NPImageBGR:
+        d, phi = self.getEstimate()
+        return plot_phi_d_diagram_bgr(self, self.belief, phi=phi, d=d)

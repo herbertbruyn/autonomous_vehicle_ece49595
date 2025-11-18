@@ -7,12 +7,12 @@ ARG ICON="cube"
 
 # ==================================================>
 # ==> Do not change the code below this line
-ARG ARCH
+ARG ARCH=amd64        # <-- Default arch so build never breaks
 ARG DISTRO=daffy
 ARG DOCKER_REGISTRY=docker.io
 ARG BASE_IMAGE=dt-ros-commons
 ARG BASE_TAG=${DISTRO}-${ARCH}
-ARG LAUNCHER=default
+ARG LAUNCHER=racer          # <-- name of your launcher (e.g. racer.sh)
 
 # define base image
 FROM ${DOCKER_REGISTRY}/duckietown/${BASE_IMAGE}:${BASE_TAG} as base
@@ -58,12 +58,13 @@ RUN dt-apt-install ${REPO_PATH}/dependencies-apt.txt
 ARG PIP_INDEX_URL="https://pypi.org/simple"
 ENV PIP_INDEX_URL=${PIP_INDEX_URL}
 COPY ./dependencies-py3.* "${REPO_PATH}/"
-RUN dt-pip3-install "${REPO_PATH}/dependencies-py3.*"
+RUN dt-pip3-install "${REPO_PATH}/dependencies-py3.*" \
+ && python3 -m pip install "numpy<2.0"
 
 # copy the source code
 COPY ./packages "${REPO_PATH}/packages"
 
-# build packages
+# build packages (ROS1 – catkin)
 RUN . /opt/ros/${ROS_DISTRO}/setup.sh && \
   catkin build \
     --workspace ${CATKIN_WS_DIR}/

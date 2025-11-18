@@ -10,7 +10,8 @@ find_package(catkin REQUIRED COMPONENTS
 catkin_package()
 
 catkin_install_python(PROGRAMS
-  src/av_racing/racing_controller.py
-  src/av_racing/stopline_brake.py
+  src/racing_controller.py
+  src/stopline_brake.py
+  src/pure_pursuit_controller.py
   DESTINATION ${CATKIN_PACKAGE_BIN_DESTINATION}
 )

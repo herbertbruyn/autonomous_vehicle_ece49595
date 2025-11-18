@@ -26,12 +26,21 @@ class PurePursuitRacer:
         self.kappa_limit = rospy.get_param('~kappa_limit',    3.0)   # 1/m
         self.baseline    = rospy.get_param('~baseline',       0.10)  # wheel separation (not used directly here)
 
-        self.cmd_topic   = rospy.get_param('~cmd_topic', '/car_cmd_switch_node/cmd')
-        pose_topic       = rospy.get_param('~pose_topic', '~lane_pose')
+        # --- topic names ---
+        pose_topic_default = 'lane_filter_node/lane_pose'
+        cmd_topic_default  = 'lane_supervisor_node/car_cmd'
+
+        # Where to send chassis commands (dt-core expects /car_cmd)
+        # self.cmd_topic = rospy.get_param('~cmd_topic', '/car_cmd')
+
+        # Where to read lane pose from (published by lane_filter_node)
+        pose_topic = rospy.get_param('~pose_topic', pose_topic_default)
+        cmd_topic = rospy.get_param('~cmd_topic', cmd_topic_default)
 
         # Publisher (chassis commands) and subscriber (lane pose)
-        self.pub_cmd = rospy.Publisher(self.ns(self.cmd_topic), Twist2DStamped, queue_size=1)
+        self.pub_cmd = rospy.Publisher(cmd_topic, Twist2DStamped, queue_size=1)
         self.sub_pose = rospy.Subscriber(pose_topic, LanePose, self.cb_pose, queue_size=1)
+        rospy.loginfo(f"[pure_pursuit] subscribing to {pose_topic}, publishing to {cmd_topic}")
 
         self.last_v = self.v_min
 
@@ -97,5 +106,7 @@ class PurePursuitRacer:
 
 if __name__ == '__main__':
     rospy.init_node('pure_pursuit_racer', anonymous=False)
+    rospy.loginfo("[pure_pursuit] node starting")
     PurePursuitRacer()
+    rospy.loginfo("[pure_pursuit] initialization done, spinning")
     rospy.spin()

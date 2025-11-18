@@ -1,2 +1,8 @@
 # LIST YOUR PYTHON3 PACKAGES HERE
 # NOTE: only place non-Duckietown libraries here; pin versions only if necessary
+lib-dt-computer-vision
+lib-dt-state-estimation
+numpy<2.0
+scipy<1.12
+
+
