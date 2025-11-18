@@ -10,4 +10,32 @@ av_racing:
     lookahead_gain: 0.60
     kappa_limit: 3.0
     baseline: 0.10
-    cmd_topic: "/car_cmd_switch_node/cmd"
+    cmd_topic: "~racing_cmd"  # Publish to avoidance controller
+  
+  yolo_obstacle_detector:
+    model_name: "yolov5n"  # Nano model for speed (yolov5s, yolov5m for accuracy)
+    confidence_threshold: 0.5
+    image_width: 640
+    image_height: 480
+    # Danger zone (normalized coordinates 0-1)
+    danger_zone_top: 0.4      # Top 40% of image
+    danger_zone_bottom: 1.0   # Bottom of image
+    danger_zone_left: 0.2     # Left 20%
+    danger_zone_right: 0.8    # Right 80%
+    # Camera parameters
+    camera_height: 0.07       # meters above ground
+    camera_pitch: 0.0         # radians
+    focal_length_px: 320      # approximate focal length
+    assumed_object_height: 0.08  # meters (duckiebot height)
+  
+  racing_obstacle_avoidance:
+    # RACING OPTIMIZED PARAMETERS
+    emergency_distance: 0.15    # Stop if very close (15cm)
+    avoid_distance: 0.60        # Start steering at 60cm
+    avoid_omega_gain: 4.0       # Aggressive steering
+    speed_reduction_close: 0.70 # 70% speed when close
+    speed_reduction_far: 0.90   # 90% speed when far
+    max_omega: 6.5              # Maximum turning rate
+    lateral_gain: 2.0           # Lateral offset influence
+    direction_mode: "smart"     # Smart direction based on obstacle position
+    # Options: 'smart', 'lane_position', 'alternate', 'right', 'left'

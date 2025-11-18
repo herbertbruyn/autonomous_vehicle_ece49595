@@ -38,7 +38,19 @@ sleep 2
 rosrun av_racing stopline_brake.py &
 sleep 0.5
 
-# main blocking process
+# YOLO obstacle detector (processes camera images)
+rosrun av_racing yolo_obstacle_detector.py &
+sleep 1.0
+
+# Racing obstacle avoidance controller with proper topic remapping
+rosrun av_racing racing_obstacle_avoidance.py \
+  racing_cmd:=/av_racing/pure_pursuit_controller/racing_cmd \
+  lane_pose:=/lane_filter_node/lane_pose \
+  obstacle_detected:=/av_racing/yolo_obstacle_detector/obstacle_detected \
+  obstacle_position:=/av_racing/yolo_obstacle_detector/obstacle_position &
+sleep 0.5
+
+# main blocking process - pure pursuit controller (now publishes to avoidance controller)
 dt-exec rosrun av_racing pure_pursuit_controller.py
 
 dt-launchfile-join
