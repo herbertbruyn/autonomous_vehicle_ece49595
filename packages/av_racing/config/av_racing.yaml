@@ -10,4 +10,4 @@ av_racing:
     lookahead_gain: 0.60
     kappa_limit: 3.0
     baseline: 0.10
-    cmd_topic: "/car_cmd_switch_node/cmd"
+    cmd_topic: "/mcqueen95/car_cmd_switch_node/cmd"

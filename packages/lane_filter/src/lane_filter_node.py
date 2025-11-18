@@ -108,7 +108,7 @@ class LaneFilterNode(DTROS):
         # Subscribers
 
         self.sub_segment_list = rospy.Subscriber(
-            "~segment_list", SegmentList, self.cbProcessSegments, queue_size=1
+            "/line_detector_node/segment_list", SegmentList, self.cbProcessSegments, queue_size=1
         )
 
         self.sub_encoder_left = rospy.Subscriber(
@@ -119,10 +119,15 @@ class LaneFilterNode(DTROS):
             "~right_wheel_encoder_driver_node/tick", WheelEncoderStamped, self.cbProcessRightEncoder, queue_size=1
         )
 
+        self.pub_debug_segments = rospy.Subscriber(
+            "/line_detector/debug/segments/compressed", CompressedImage, self.dummy_callback, queue_size=1
+        )
 
         # Publishers
+        lane_topic_default = '/mcqueen95/lane_filter_node/lane_pose'
+        lane_pose_topic = rospy.get_param("~lane_pose_topic", lane_topic_default)
         self.pub_lane_pose = rospy.Publisher(
-            "~lane_pose", LanePose, queue_size=1, dt_topic_type=TopicType.PERCEPTION
+            lane_pose_topic, LanePose, queue_size=1, dt_topic_type=TopicType.PERCEPTION
         )
 
         self.pub_belief_img = rospy.Publisher(
@@ -132,6 +137,8 @@ class LaneFilterNode(DTROS):
         self.pub_plot_d_phi = rospy.Publisher(
             "~debug/plot_d_phi/compressed", CompressedImage, queue_size=1, dt_topic_type=TopicType.DEBUG
         )
+
+
 
 
 
@@ -161,6 +168,9 @@ class LaneFilterNode(DTROS):
                 SegmentPoint(x=p2.x, y=p2.y),
             ],
         )
+
+    def dummy_callback(self, msg):
+        pass
 
     def cbProcessLeftEncoder(self, left_encoder_msg):
         # we need to account for the possibility that the encoder is not reading
@@ -194,6 +204,8 @@ class LaneFilterNode(DTROS):
             segment_list_msg (:obj:`SegmentList`): message containing list of processed segments
 
         """
+        self.loginfo(f"Received SegmentList with {len(segment_list_msg.segments)} segments.")
+        
         self.cbPredict()
         self.last_update_header = segment_list_msg.header
         dt_segment_list = []
@@ -239,6 +251,8 @@ class LaneFilterNode(DTROS):
         lanePose.status = lanePose.NORMAL
 
         self.pub_lane_pose.publish(lanePose)
+        self.loginfo(f"Published LanePose: d={lanePose.d:.3f}, phi={lanePose.phi:.3f}, in_lane={lanePose.in_lane}")
+        
         if self._debug:
             self.debugOutput()
 

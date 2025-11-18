@@ -56,8 +56,8 @@ class StopLineFilterNode(DTROS):
 
 
         ## publishers and subscribers
-        self.sub_segs = rospy.Subscriber("~segment_list", SegmentList, self.cb_segments)
-        self.sub_lane = rospy.Subscriber("~lane_pose", LanePose, self.cb_lane_pose)
+        self.sub_segs = rospy.Subscriber("/line_detector_node/segment_list", SegmentList, self.cb_segments)
+        self.sub_lane = rospy.Subscriber('/mcqueen95/lane_filter_node/lane_pose', LanePose, self.cb_lane_pose)
         self.pub_stop_line_reading = rospy.Publisher("~stop_line_reading", StopLineReading, queue_size=1, latch=True)
         self.pub_at_stop_line = rospy.Publisher("~at_stop_line", BoolStamped, queue_size=1)
 

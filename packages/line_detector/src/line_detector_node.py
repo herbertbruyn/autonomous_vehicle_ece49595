@@ -96,7 +96,7 @@ class LineDetectorNode(DTROS):
 
         # Subscribers
         self.sub_image = rospy.Subscriber(
-            "~image/compressed", CompressedImage, self.image_cb, buff_size=10000000, queue_size=1
+            "/mcqueen95/camera_node/image/compressed", CompressedImage, self.image_cb, buff_size=10000000, queue_size=1
         )
 
         self.sub_thresholds = rospy.Subscriber(
@@ -143,6 +143,7 @@ class LineDetectorNode(DTROS):
             image_msg (:obj:`sensor_msgs.msg.CompressedImage`): The receive image message
 
         """
+        self.loginfo("Processing image in image_cb.")
 
         # Decode from compressed image with OpenCV
         try:
@@ -227,6 +228,7 @@ class LineDetectorNode(DTROS):
                     self.logerr(f"Color name {color} is not defined in the Segment type")
 
         # Publish the message
+        self.loginfo(f"Published SegmentList with {len(segment_list.segments)} segments.")
         self.pub_lines.publish(segment_list)
         
         if self.cuda_enabled:
@@ -237,7 +239,7 @@ class LineDetectorNode(DTROS):
             image = gpu_image
 
         # If there are any subscribers to the debug topics, generate a debug image and publish it
-        if self.pub_d_segments.get_num_connections() > 0:
+        if self.pub_d_segments.get_num_connections() >= 0:
             debug_img = draw_segments(image,
                                       {
                                         self.color_ranges["YELLOW"]: color_detections[0],
@@ -245,6 +247,27 @@ class LineDetectorNode(DTROS):
                                         self.color_ranges["RED"]: color_detections[2]
                                       }
                                     )
+            
+            
+            
+            import os
+            
+            # Define the filename and path
+            # Using the image header timestamp ensures a unique file name
+            timestamp = image_msg.header.stamp.to_sec()
+            filename = f"/data/segments_debug_{timestamp:.4f}.png"
+            
+            # Ensure the directory exists (optional, but good practice)
+            # You might need to adjust the path if /data isn't accessible
+            os.makedirs(os.path.dirname(filename), exist_ok=True)
+            
+            # Save the image using OpenCV
+            cv2.imwrite(filename, debug_img)
+            self.loginfo(f"Saved segment debug image to {filename}")
+
+
+
+
 
             # mirror the image if left-hand traffic mode is set
             if self._traffic_mode.value == "LHT":

@@ -19,7 +19,7 @@ class LanePoseVisualzer:
         self.pub_markers = rospy.Publisher("~lane_pose_markers", MarkerArray, queue_size=1)
 
         # Setup subscriber
-        self.sub_lane_pose = rospy.Subscriber("~lane_pose", LanePose, self.cbLanePose, queue_size=1)
+        self.sub_lane_pose = rospy.Subscriber("/mcqueen95/lane_filter_node/lane_pose", LanePose, self.cbLanePose, queue_size=1)
 
         rospy.loginfo(f"[{self.node_name}] Initialzed.")
 

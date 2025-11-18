@@ -7,7 +7,7 @@ from duckietown_msgs.msg import StopLineReading, Twist2DStamped
 
 class StoplineBrake:
     def __init__(self):
-        self.cmd_topic = rospy.get_param('~cmd_topic', '/car_cmd_switch_node/cmd')
+        self.cmd_topic = rospy.get_param('~cmd_topic', '/mcqueen95/car_cmd_switch_node/cmd')
         self.min_hold  = rospy.get_param('~hold_seconds', 1.0)  # brake hold time
         self.at_count_req = rospy.get_param('~confirm_frames', 3)
 

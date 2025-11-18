@@ -6,6 +6,7 @@ import rospy
 from duckietown_msgs.msg import LanePose, Twist2DStamped
 
 NORMAL = 0
+PUBLISH_RATE_HZ = 10.0
 
 def clamp(x, lo, hi):
     return max(lo, min(hi, x))
@@ -27,8 +28,8 @@ class PurePursuitRacer:
         self.baseline    = rospy.get_param('~baseline',       0.10)  # wheel separation (not used directly here)
 
         # --- topic names ---
-        pose_topic_default = 'lane_filter_node/lane_pose'
-        cmd_topic_default  = 'lane_supervisor_node/car_cmd'
+        pose_topic_default = '/mcqueen95/lane_filter_node/lane_pose'
+        cmd_topic_default  = '/mcqueen95/car_cmd_switch_node/cmd'
 
         # Where to send chassis commands (dt-core expects /car_cmd)
         # self.cmd_topic = rospy.get_param('~cmd_topic', '/car_cmd')
@@ -38,6 +39,10 @@ class PurePursuitRacer:
         cmd_topic = rospy.get_param('~cmd_topic', cmd_topic_default)
 
         # Publisher (chassis commands) and subscriber (lane pose)
+        # Create a timer that calls self.publish_cmd every 1/PUBLISH_RATE_HZ seconds
+        # rospy.Timer(rospy.Duration(1.0 / PUBLISH_RATE_HZ), self.cb_pose)
+        # rospy.loginfo(f"[pure_pursuit] Publishing test commands to {cmd_topic} at {PUBLISH_RATE_HZ} Hz")
+        
         self.pub_cmd = rospy.Publisher(cmd_topic, Twist2DStamped, queue_size=1)
         self.sub_pose = rospy.Subscriber(pose_topic, LanePose, self.cb_pose, queue_size=1)
         rospy.loginfo(f"[pure_pursuit] subscribing to {pose_topic}, publishing to {cmd_topic}")
@@ -60,6 +65,8 @@ class PurePursuitRacer:
         return clamp(v, self.v_min, self.v_max)
 
     def cb_pose(self, msg: LanePose):
+        rospy.loginfo(f"[pure_pursuit] Received new LanePose: d={msg.d:.3f}, phi={msg.phi:.3f}")
+        
         # Extract lane-pose signals (from lane_filter)
         phi = float(msg.phi)         # heading error [rad]
         d   = float(msg.d)           # lateral offset [m]
@@ -103,6 +110,7 @@ class PurePursuitRacer:
         cmd.v = v_cmd
         cmd.omega = omega_cmd
         self.pub_cmd.publish(cmd)
+        rospy.loginfo(f"[pure_pursuit] Published command: v={cmd.v}, omega={cmd.omega}")
 
 if __name__ == '__main__':
     rospy.init_node('pure_pursuit_racer', anonymous=False)
