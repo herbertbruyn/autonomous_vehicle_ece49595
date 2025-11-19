@@ -1,0 +1,216 @@
+<?xml version="1.0"?>
+<launch>
+    <!-- 
+    Complete Racing System with Object Detection and Collision Avoidance
+    
+    Supports both racing_controller and pure_pursuit_controller
+    
+    Usage:
+        # With racing controller (default)
+        roslaunch av_racing racing_with_object_detection.launch veh:=mcqueen95
+        
+        # With pure pursuit controller
+        roslaunch av_racing racing_with_object_detection.launch veh:=mcqueen95 controller:=pure_pursuit
+        
+        # With enhanced controllers (built-in obstacle awareness)
+        roslaunch av_racing racing_with_object_detection.launch veh:=mcqueen95 controller:=enhanced_racing
+        roslaunch av_racing racing_with_object_detection.launch veh:=mcqueen95 controller:=enhanced_pure_pursuit
+    -->
+    
+    <!-- ====== Arguments ====== -->
+    <arg name="veh" default="mcqueen95" doc="Name of vehicle"/>
+    <arg name="controller" default="racing" 
+         doc="Controller type: 'racing', 'pure_pursuit', 'enhanced_racing', or 'enhanced_pure_pursuit'"/>
+    <arg name="use_simple_detector" default="false" 
+         doc="Use simple color detector instead of YOLO"/>
+    <arg name="avoidance_mode" default="slow" 
+         doc="Obstacle avoidance mode: 'stop' or 'slow'"/>
+    <arg name="enable_debug_images" default="true" 
+         doc="Publish debug images with detections"/>
+    <arg name="use_collision_avoidance" default="true"
+         doc="Enable collision avoidance safety layer (not needed with enhanced controllers)"/>
+    
+    <!-- ====== Object Detection Node ====== -->
+    <group unless="$(arg use_simple_detector)">
+        <node pkg="object_detection" 
+              type="object_detector_node.py" 
+              name="object_detector_node" 
+              output="screen">
+            
+            <!-- Camera topic -->
+            <remap from="~camera/image/compressed" 
+                   to="/$(arg veh)/camera_node/image/compressed"/>
+            
+            <!-- Detection Parameters -->
+            <param name="confidence_threshold" value="0.5"/>
+            <param name="iou_threshold" value="0.45"/>
+            <param name="danger_zone_height" value="0.6"/>
+            <param name="min_box_area" value="1000"/>
+            <param name="process_every_n_frames" value="2"/>
+            <param name="image_scale" value="0.8"/>
+            
+            <!-- Target classes -->
+            <rosparam param="target_classes">
+                ['person', 'dog', 'cat', 'bird', 'sports ball']
+            </rosparam>
+        </node>
+    </group>
+    
+    <!-- Simple Color Detector (alternative) -->
+    <group if="$(arg use_simple_detector)">
+        <node pkg="object_detection" 
+              type="simple_detector_node.py" 
+              name="object_detector_node" 
+              output="screen">
+            
+            <!-- Camera topic -->
+            <remap from="~camera/image/compressed" 
+                   to="/$(arg veh)/camera_node/image/compressed"/>
+            
+            <!-- Detection Parameters -->
+            <param name="min_area" value="3000"/>
+            <param name="danger_zone_height" value="0.6"/>
+            <param name="enable_yellow" value="true"/>
+            <param name="enable_orange" value="true"/>
+            
+            <!-- HSV color ranges -->
+            <rosparam param="lower_yellow">[20, 100, 100]</rosparam>
+            <rosparam param="upper_yellow">[30, 255, 255]</rosparam>
+            <rosparam param="lower_orange">[5, 150, 150]</rosparam>
+            <rosparam param="upper_orange">[15, 255, 255]</rosparam>
+        </node>
+    </group>
+    
+    <!-- ====== Collision Avoidance Safety Layer ====== -->
+    <!-- Only used with non-enhanced controllers -->
+    <group if="$(arg use_collision_avoidance)">
+        <node pkg="av_racing" 
+              type="collision_avoidance_node.py" 
+              name="collision_avoidance_node" 
+              output="screen"
+              unless="$(eval controller == 'enhanced_racing' or controller == 'enhanced_pure_pursuit')">
+            
+            <!-- Lane pose topic -->
+            <remap from="~lane_pose" to="/$(arg veh)/lane_filter_node/lane_pose"/>
+            
+            <!-- Avoidance Parameters -->
+            <param name="avoidance_mode" value="$(arg avoidance_mode)"/>
+            <param name="safe_velocity" value="0.0"/>
+            <param name="reduced_velocity" value="0.15"/>
+            <param name="obstacle_timeout" value="0.5"/>
+            <param name="control_priority" value="true"/>
+            
+            <!-- Steering gains for slow mode -->
+            <param name="k_phi" value="3.0"/>
+            <param name="k_d" value="5.0"/>
+        </node>
+    </group>
+    
+    <!-- ====== Racing Controllers ====== -->
+    
+    <!-- Original Racing Controller -->
+    <group if="$(eval controller == 'racing')">
+        <node pkg="av_racing" 
+              type="racing_controller.py" 
+              name="racing_controller" 
+              output="screen">
+            <remap from="~lane_pose" to="/$(arg veh)/lane_filter_node/lane_pose"/>
+            
+            <!-- Racing Parameters -->
+            <param name="v_base" value="0.35"/>
+            <param name="v_min" value="0.10"/>
+            <param name="v_max" value="0.60"/>
+            <param name="k_phi" value="3.5"/>
+            <param name="k_d" value="8.0"/>
+            <param name="alpha_phi" value="2.0"/>
+            <param name="alpha_d" value="3.0"/>
+            <param name="alpha_kappa" value="0.5"/>
+        </node>
+    </group>
+    
+    <!-- Original Pure Pursuit Controller -->
+    <group if="$(eval controller == 'pure_pursuit')">
+        <node pkg="av_racing" 
+              type="pure_pursuit_controller.py" 
+              name="pure_pursuit_racer" 
+              output="screen">
+            <param name="pose_topic" value="/$(arg veh)/lane_filter_node/lane_pose"/>
+            <param name="cmd_topic" value="/$(arg veh)/car_cmd_switch_node/cmd"/>
+            
+            <!-- Pure Pursuit Parameters -->
+            <param name="v_base" value="0.40"/>
+            <param name="v_min" value="0.10"/>
+            <param name="v_max" value="0.70"/>
+            <param name="lookahead_base" value="0.20"/>
+            <param name="lookahead_gain" value="0.60"/>
+            <param name="kappa_limit" value="3.0"/>
+            <param name="alpha_phi" value="2.0"/>
+            <param name="alpha_d" value="2.5"/>
+            <param name="alpha_kappa" value="0.6"/>
+        </node>
+    </group>
+    
+    <!-- Enhanced Racing Controller (built-in obstacle awareness) -->
+    <group if="$(eval controller == 'enhanced_racing')">
+        <node pkg="av_racing" 
+              type="enhanced_racing_controller.py" 
+              name="enhanced_racing_controller" 
+              output="screen">
+            <remap from="~lane_pose" to="/$(arg veh)/lane_filter_node/lane_pose"/>
+            
+            <!-- Racing Parameters -->
+            <param name="v_base" value="0.35"/>
+            <param name="v_min" value="0.10"/>
+            <param name="v_max" value="0.60"/>
+            <param name="k_phi" value="3.5"/>
+            <param name="k_d" value="8.0"/>
+            <param name="alpha_phi" value="2.0"/>
+            <param name="alpha_d" value="3.0"/>
+            <param name="alpha_kappa" value="0.5"/>
+            
+            <!-- Obstacle Parameters -->
+            <param name="obstacle_mode" value="$(arg avoidance_mode)"/>
+            <param name="v_obstacle_stop" value="0.0"/>
+            <param name="v_obstacle_slow" value="0.15"/>
+            <param name="speed_transition_rate" value="2.0"/>
+        </node>
+    </group>
+    
+    <!-- Enhanced Pure Pursuit Controller (built-in obstacle awareness) -->
+    <group if="$(eval controller == 'enhanced_pure_pursuit')">
+        <node pkg="av_racing" 
+              type="enhanced_pure_pursuit.py" 
+              name="enhanced_pure_pursuit_racer" 
+              output="screen">
+            <param name="pose_topic" value="/$(arg veh)/lane_filter_node/lane_pose"/>
+            <param name="cmd_topic" value="/$(arg veh)/car_cmd_switch_node/cmd"/>
+            
+            <!-- Pure Pursuit Parameters -->
+            <param name="v_base" value="0.40"/>
+            <param name="v_min" value="0.10"/>
+            <param name="v_max" value="0.70"/>
+            <param name="lookahead_base" value="0.20"/>
+            <param name="lookahead_gain" value="0.60"/>
+            <param name="kappa_limit" value="3.0"/>
+            <param name="alpha_phi" value="2.0"/>
+            <param name="alpha_d" value="2.5"/>
+            <param name="alpha_kappa" value="0.6"/>
+            
+            <!-- Obstacle Parameters -->
+            <param name="obstacle_mode" value="$(arg avoidance_mode)"/>
+            <param name="v_obstacle_stop" value="0.0"/>
+            <param name="v_obstacle_slow" value="0.20"/>
+            <param name="speed_transition_rate" value="2.5"/>
+        </node>
+    </group>
+    
+    <!-- ====== Debug Image Viewer (Optional) ====== -->
+    <group if="$(arg enable_debug_images)">
+        <node pkg="rqt_image_view" 
+              type="rqt_image_view" 
+              name="detection_viewer" 
+              args="/object_detector_node/detection_image/compressed"
+              required="false"/>
+    </group>
+    
+</launch>

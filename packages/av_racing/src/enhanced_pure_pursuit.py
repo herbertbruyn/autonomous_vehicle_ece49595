@@ -1,5 +1,17 @@
 #!/usr/bin/env python3
-"""Pure Pursuit-style racing controller for Duckietown using LanePose."""
+"""
+Enhanced Pure Pursuit Racing Controller with Obstacle Awareness
+
+Based on pure_pursuit_controller.py but adds integrated obstacle detection support.
+
+Subscribes:
+  ~pose_topic (duckietown_msgs/LanePose)
+  /object_detector_node/obstacle_alert (std_msgs/Bool)
+  /object_detector_node/detection_classes (std_msgs/String)
+
+Publishes:
+  ~cmd_topic (duckietown_msgs/Twist2DStamped)
+"""
 
 import math
 import rospy
@@ -12,7 +24,7 @@ def clamp(x, lo, hi):
     return max(lo, min(hi, x))
 
 
-class PurePursuitRacer:
+class EnhancedPurePursuitRacer:
     def __init__(self):
         # --- Original speed params ---
         self.v_base  = rospy.get_param('~v_base',  0.40)
@@ -186,9 +198,10 @@ class PurePursuitRacer:
             f"[enhanced_pp] Command: v={cmd.v:.3f} m/s, ω={cmd.omega:.3f} rad/s"
             f"{' [OBSTACLE MODE]' if self.obstacle_detected else ''}")
 
+
 if __name__ == '__main__':
-    rospy.init_node('pure_pursuit_racer', anonymous=False)
-    rospy.loginfo("[pure_pursuit] node starting")
-    PurePursuitRacer()
-    rospy.loginfo("[pure_pursuit] initialization done, spinning")
+    rospy.init_node('enhanced_pure_pursuit_racer', anonymous=False)
+    rospy.loginfo("[enhanced_pp] node starting")
+    EnhancedPurePursuitRacer()
+    rospy.loginfo("[enhanced_pp] initialization done, spinning")
     rospy.spin()

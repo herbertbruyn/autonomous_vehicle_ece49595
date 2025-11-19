@@ -39,6 +39,6 @@ rosrun av_racing stopline_brake.py &
 sleep 0.5
 
 # main blocking process
-dt-exec rosrun av_racing pure_pursuit_controller.py
+dt-exec roslaunch av_racing racing_with_object_detection.launch veh:=mcqueen95
 
 dt-launchfile-join
