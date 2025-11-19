@@ -1,12 +1,15 @@
 <?xml version="1.0"?>
-<package>
-  <n>object_detection</n>
+<package format="2">
+  <name>object_detection</name>
   <version>1.0.0</version>
   <description>Object detection for collision avoidance</description>
-  <maintainer email="your@email.com">Your Name</maintainer>
+
+  <maintainer email="hdebruyn@purdue.edu">Herbert A. de Bruyn</maintainer>
   <license>MIT</license>
+
   <buildtool_depend>catkin</buildtool_depend>
-  <depend>rospy</depend>
-  <depend>sensor_msgs</depend>
-  <depend>std_msgs</depend>
+
+  <exec_depend>rospy</exec_depend>
+  <exec_depend>sensor_msgs</exec_depend>
+  <exec_depend>std_msgs</exec_depend>
 </package>

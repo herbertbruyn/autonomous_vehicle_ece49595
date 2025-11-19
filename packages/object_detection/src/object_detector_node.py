@@ -17,6 +17,7 @@ import numpy as np
 from sensor_msgs.msg import CompressedImage
 from std_msgs.msg import Bool, String
 import torch
+import time
 
 
 class ObjectDetectorNode:
@@ -45,7 +46,7 @@ class ObjectDetectorNode:
         except Exception as e:
             rospy.logerr(f"Failed to load YOLO model: {e}")
             rospy.signal_shutdown("Model loading failed")
-            return
+            raise
         
         # Publishers
         self.pub_obstacle_alert = rospy.Publisher('~obstacle_alert', Bool, queue_size=1)
@@ -70,7 +71,6 @@ class ObjectDetectorNode:
             return
         
         try:
-            import time
             start_time = time.time()
             
             # Decode image

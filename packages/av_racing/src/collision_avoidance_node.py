@@ -42,11 +42,13 @@ class CollisionAvoidanceNode:
         rospy.loginfo("="*60)
     
     def cb_obstacle(self, msg):
+        current_time = rospy.Time.now()
         if msg.data:
             self.obstacle_detected = True
-            self.last_obstacle_time = rospy.Time.now()
+            self.last_obstacle_time = current_time
         else:
-            if (rospy.Time.now() - self.last_obstacle_time).to_sec() > self.obstacle_timeout:
+            # Keep obstacle status for timeout period after last detection
+            if (current_time - self.last_obstacle_time).to_sec() > self.obstacle_timeout:
                 self.obstacle_detected = False
     
     def cb_classes(self, msg):

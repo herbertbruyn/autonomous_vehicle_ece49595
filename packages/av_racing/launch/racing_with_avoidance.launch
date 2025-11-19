@@ -1,0 +1,101 @@
+<?xml version="1.0"?>
+<launch>
+    <!-- 
+    Pure Pursuit Controller + YOLO with TRUE Obstacle Avoidance
+    
+    Modes:
+        - stop: Robot stops completely when obstacle detected
+        - slow: Robot slows down but stays in lane
+        - avoid: Robot steers around obstacle while staying within lane bounds (NEW!)
+    
+    Usage:
+        # Default: Avoid mode (steers around obstacles)
+        roslaunch av_racing racing_with_avoidance.launch veh:=mcqueen95
+        
+        # Slow mode (no steering, just slow down)
+        roslaunch av_racing racing_with_avoidance.launch veh:=mcqueen95 avoidance_mode:=slow
+        
+        # Stop mode (stops completely)
+        roslaunch av_racing racing_with_avoidance.launch veh:=mcqueen95 avoidance_mode:=stop
+    -->
+    
+    <!-- ====== Arguments ====== -->
+    <arg name="veh" default="mcqueen95" doc="Name of vehicle"/>
+    <arg name="avoidance_mode" default="avoid" 
+         doc="Obstacle avoidance mode: 'stop', 'slow', or 'avoid' (lateral steering)"/>
+    <arg name="enable_debug_images" default="true" 
+         doc="Show debug visualization window"/>
+    
+    <!-- ====== YOLO Object Detection ====== -->
+    <node pkg="object_detection" 
+          type="object_detector_node.py" 
+          name="object_detector_node" 
+          output="screen">
+        
+        <!-- Camera topic -->
+        <remap from="~camera/image/compressed" 
+               to="/$(arg veh)/camera_node/image/compressed"/>
+        
+        <!-- Detection Parameters -->
+        <param name="confidence_threshold" value="0.5"/>
+        <param name="iou_threshold" value="0.45"/>
+        <param name="danger_zone_height" value="0.6"/>
+        <param name="min_box_area" value="1000"/>
+        <param name="process_every_n_frames" value="2"/>
+        <param name="image_scale" value="0.8"/>
+        
+        <!-- Target classes to detect -->
+        <rosparam param="target_classes">
+            ['person', 'dog', 'cat', 'bird', 'sports ball']
+        </rosparam>
+    </node>
+    
+    <!-- ====== Pure Pursuit with Lateral Avoidance ====== -->
+    <node pkg="av_racing" 
+          type="pure_pursuit_with_lateral_avoidance.py" 
+          name="pure_pursuit_avoidance" 
+          output="screen">
+        
+        <!-- Vehicle Configuration -->
+        <param name="veh_name" value="$(arg veh)"/>
+        
+        <!-- Topic Configuration -->
+        <param name="pose_topic" value="/$(arg veh)/lane_filter_node/lane_pose"/>
+        <param name="cmd_topic" value="/$(arg veh)/car_cmd_switch_node/cmd"/>
+        <param name="obstacle_topic" value="/object_detector_node/obstacle_alert"/>
+        <param name="classes_topic" value="/object_detector_node/detection_classes"/>
+        
+        <!-- Pure Pursuit Parameters -->
+        <param name="v_base" value="0.40"/>
+        <param name="v_min" value="0.10"/>
+        <param name="v_max" value="0.70"/>
+        <param name="lookahead_base" value="0.20"/>
+        <param name="lookahead_gain" value="0.60"/>
+        <param name="kappa_limit" value="3.0"/>
+        <param name="alpha_phi" value="2.0"/>
+        <param name="alpha_d" value="2.5"/>
+        <param name="alpha_kappa" value="0.6"/>
+        
+        <!-- Obstacle Avoidance Parameters -->
+        <param name="obstacle_mode" value="$(arg avoidance_mode)"/>
+        <param name="v_obstacle_stop" value="0.0"/>
+        <param name="v_obstacle_slow" value="0.20"/>
+        <param name="speed_transition_rate" value="2.5"/>
+        
+        <!-- Lateral Avoidance Parameters (only used in 'avoid' mode) -->
+        <param name="avoidance_offset" value="0.15"/>        <!-- How far to shift laterally (m) -->
+        <param name="avoidance_smoothness" value="0.3"/>     <!-- Transition speed (m/s) -->
+        <param name="lane_width" value="0.23"/>              <!-- Duckietown lane width -->
+        <param name="max_lateral_offset" value="0.09"/>      <!-- Max offset (40% of lane width) -->
+    </node>
+    
+    <!-- ====== Debug Image Viewer (Optional) ====== -->
+    <group if="$(arg enable_debug_images)">
+        <node pkg="rqt_image_view" 
+              type="rqt_image_view" 
+              name="detection_viewer" 
+              args="/object_detector_node/detection_image/compressed"
+              required="false"/>
+    </group>
+    
+</launch>
