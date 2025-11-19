@@ -45,7 +45,7 @@ class PurePursuitWithAvoidance:
         self.avoidance_offset = rospy.get_param('~avoidance_offset', 0.15)  # How far to shift laterally (m)
         self.avoidance_smoothness = rospy.get_param('~avoidance_smoothness', 0.3)  # Transition speed
         self.lane_width = rospy.get_param('~lane_width', 0.23)  # Duckietown lane width (m)
-        self.max_lateral_offset = self.lane_width * 0.4  # Don't go beyond 40% of lane width
+        self.max_lateral_offset = rospy.get_param('~max_lateral_offset', self.lane_width * 0.4) # Don't go beyond 40% of lane width
         
         # --- Topic names ---
         veh_name = rospy.get_param('~veh_name', 'mcqueen95')

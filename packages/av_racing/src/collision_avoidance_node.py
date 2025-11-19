@@ -25,7 +25,10 @@ class CollisionAvoidanceNode:
         self.lane_pose = None
         self.detected_classes = ""
         
-        self.pub_cmd = rospy.Publisher('/car_cmd_switch_node/cmd', 
+        veh_name = rospy.get_param('~veh_name', 'mcqueen95')
+        cmd_topic = f'/{veh_name}/car_cmd_switch_node/cmd'
+
+        self.pub_cmd = rospy.Publisher(cmd_topic, 
                                       Twist2DStamped, queue_size=1)
         self.sub_obstacle = rospy.Subscriber('/object_detector_node/obstacle_alert', 
                                             Bool, self.cb_obstacle, queue_size=1)

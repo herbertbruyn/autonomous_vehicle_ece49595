@@ -12,6 +12,7 @@ catkin_package()
 catkin_install_python(PROGRAMS
   src/collision_avoidance_node.py
   src/stopline_brake.py
-  src/pure_pursuit_controller.py
+  src/pure_pursuit_with_lateral_avoidance.py
   DESTINATION ${CATKIN_PACKAGE_BIN_DESTINATION}
 )
+
